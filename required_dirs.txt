@@ -1,0 +1,7 @@
+static_data
+temp_data
+temp_scripts
+temp_sql
+data
+scripts
+template_files
