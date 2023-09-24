@@ -1,0 +1,47 @@
+# 
+# YAML init file for beekeeper 
+#
+#
+globals:
+    project_home: $RQ_HOME
+    service_module: rq_services
+    processor_module: rq_processors
+    macro_module: rq_macros
+
+service_objects:
+
+macros:
+
+targets:
+    nation:
+      url: https://datausa.io/api/data
+      method: GET
+      headers:                                            
+        Content-Type: application/json
+
+      request_params:
+        - name: drilldowns
+          value: Nation
+
+        - name: measures
+          value: Population
+
+        - name: year
+          value: latest
+
+    
+    state:
+      url: https://datausa.io/api/data
+      method: GET
+      headers:
+        Content-Type: application/json
+
+      request_params:
+        - name: drilldowns
+          value: State
+
+        - name: measures
+          value: Population
+
+        - name: year
+          value: latest

@@ -4,7 +4,7 @@ required-dirs:
 	cat required_dirs.txt | xargs mkdir -p
 
 
-list-datafiles:
+dl-manifest:
 	$(eval BASE_URL=https://download.bls.gov)
 
 	#lftp -c du -a https://download.bls.gov/pub/time.series/pr/ \
@@ -22,6 +22,39 @@ list-datafiles:
 	| tuple2json --delimiter '|' --keys=base_url,srcfile,local_file,header_file > temp_data/file_download_manifest.json
 
 
+get-headers:
+
+	cp template_files/shell_script_core.sh.tpl temp_scripts/download_headers.sh
+
+	loopr -p -j --listfile temp_data/file_download_manifest.json \
+	--cmd-string 'curl -I {base_url}{srcfile} > temp_data/{header_file}' \
+	>> temp_scripts/download_headers.sh
+
+	chmod u+x temp_scripts/download_headers.sh
+	temp_scripts/download_headers.sh
+
+
+get-filedata:
+
+	cp template_files/shell_script_core.sh.tpl temp_scripts/download_files.sh
+
+	loopr -p -j --listfile temp_data/file_download_manifest.json \
+	--cmd-string 'wget -U "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/81.0" {base_url}{srcfile} -O temp_data/{local_file}; pause 1' \
+	>> temp_scripts/download_files.sh
+
+	chmod u+x temp_scripts/download_files.sh
+	temp_scripts/download_files.sh
+
+
+get-apidata:
+
+	beekeeper --config config/bkpr_datausa.yaml --target state | jq -r .data \
+	> temp_data/pop_data_state.json
+
+	beekeeper --config config/bkpr_datausa.yaml --target nation | jq -r .data \
+	> temp_data/pop_data_nation.json
+	
+
 scratch:
 	cp template_files/shell_script_core.sh.tpl temp_scripts/read_headers.sh
 
@@ -37,7 +70,3 @@ scratch:
 	#--cmd-string ''
 
 
-
-download-files:
-	echo 'placeholder'
-	
