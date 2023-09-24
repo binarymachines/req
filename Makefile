@@ -23,11 +23,12 @@ dl-manifest:
 
 
 get-headers:
+	$(eval USER_AGENT=Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/81.0)
 
 	cp template_files/shell_script_core.sh.tpl temp_scripts/download_headers.sh
 
 	loopr -p -j --listfile temp_data/file_download_manifest.json \
-	--cmd-string 'curl -I {base_url}{srcfile} > temp_data/{header_file}' \
+	--cmd-string 'curl -A "$(USER_AGENT)" -I {base_url}{srcfile} > temp_data/{header_file}' \
 	>> temp_scripts/download_headers.sh
 
 	chmod u+x temp_scripts/download_headers.sh
@@ -35,25 +36,42 @@ get-headers:
 
 
 get-filedata:
+	$(eval USER_AGENT=Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/81.0)
 
 	cp template_files/shell_script_core.sh.tpl temp_scripts/download_files.sh
 
 	loopr -p -j --listfile temp_data/file_download_manifest.json \
-	--cmd-string 'wget -U "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/81.0" {base_url}{srcfile} -O temp_data/{local_file}; pause 1' \
+	--cmd-string 'wget -U "$(USER_AGENT)" {base_url}{srcfile} -O temp_data/{local_file}; pause 1' \
 	>> temp_scripts/download_files.sh
 
 	chmod u+x temp_scripts/download_files.sh
 	temp_scripts/download_files.sh
 
 
-get-apidata:
+gen-metahashes:
+	loopr -j --listfile temp_data/file_download_manifest.json \
+	--cmd-string 'scripts/parse_header.py --file temp_data/{header_file} --fields=content-length,last-modified' \
+	> temp_data/header_fields.jsonl
 
+	cp template_files/shell_script_core.sh.tpl temp_scripts/generate_metahashes.sh
+
+	loopr -p -t --listfile temp_data/header_fields.jsonl --vartoken % \
+	--cmd-string "md5sum <<< '%'" >> temp_scripts/generate_metahashes.sh
+
+	chmod u+x temp_scripts/generate_metahashes.sh
+	temp_scripts/generate_metahashes.sh > temp_data/metahashes.txt
+
+	mergein2j --from-list temp_data/metahashes.txt --key metahash --into temp_data/file_download_manifest.json \
+	> temp_data/file_ingest_manifest.json
+
+
+get-apidata:
 	beekeeper --config config/bkpr_datausa.yaml --target state | jq -r .data \
 	> temp_data/pop_data_state.json
 
 	beekeeper --config config/bkpr_datausa.yaml --target nation | jq -r .data \
 	> temp_data/pop_data_nation.json
-	
+
 
 scratch:
 	cp template_files/shell_script_core.sh.tpl temp_scripts/read_headers.sh

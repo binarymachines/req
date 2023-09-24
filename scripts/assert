@@ -1,0 +1,90 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    assert <description> --test <module.function> [--params=<name:value>...]
+    assert --config <configfile> <description> --test <module.function> [--params=<name:value>...]
+
+'''
+
+import os, sys
+import json
+import docopt
+from contextlib import contextmanager
+from collections import namedtuple
+from mercury.mlog import mlog, mlog_err
+from mercury.utils import parse_cli_params
+from snap import snap, common
+
+from assertlib import AssertionContext
+
+
+AssertionResult = namedtuple('AssertionResult', 'ok exception message')
+
+
+class Assertion(object):
+    def __init__(self, actx: AssertionContext) -> None:
+        self.context = actx
+
+    def make(self, assertion_func, **params):
+
+        result = None
+        try:
+            result = assertion_func(self.context, **params)
+            if result == True:
+                return AssertionResult(ok=result, exception=False, message='test passed.')
+            elif result == False:
+                return AssertionResult(ok=result, exception=False, message='test failed.')
+            else:
+                raise Exception(f'The test function {str(assertion_func)} must return a Boolean value.')
+            
+        except Exception as err:
+            return AssertionResult(ok=False, exception=True, message=f'{err.__class__.__name__} thrown: {str(err)}')
+ 
+        
+def main(args):
+
+    sys.path.append(os.getcwd())
+    test_description = args['<description>']
+
+    should_halt = False
+
+    service_registry = common.ServiceObjectRegistry(dict())
+
+    if args['--config']:
+        configfile = args['<configfile>']
+        yaml_config = common.read_config_file(configfile)
+        service_registry = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+    
+    testfunc_string = args['<module.function>']
+    tokens = testfunc_string.split('.')
+    if not len(tokens) == 2:
+        raise Exception('The test-function designator must be of the format <module.function>.')
+    
+    test_module = tokens[0]
+    test_funcname = tokens[1]
+    test_function = common.load_class(test_funcname, test_module)
+
+    test_params = parse_cli_params(args['--params'])
+
+    actx = AssertionContext(test_description, service_registry)
+
+    assertion_result = Assertion(actx).make(test_function, **test_params)
+
+    readout = {
+        'test': test_description,
+        'result': assertion_result
+    }
+
+    mlog(json.dumps(readout))
+    
+    if assertion_result.ok == False and should_halt:
+        return 1
+    
+    return 0
+
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
