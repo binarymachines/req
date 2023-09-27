@@ -20,13 +20,12 @@ from sqlalchemy import create_engine
 from sqlalchemy import MetaData
 from sqlalchemy_utils import UUIDType
 
-import redisx
-import redis
+
 from mercury.mlog import mlog, mlog_err
 import uuid
 
 import psycopg2
-import apx_utils as utils
+import rq_utils as utils
 
 
 S3_AUTH_ERROR_MESSAGE = """
@@ -296,36 +295,6 @@ class S3Service(object):
         return jsondata
 
 
-class SimpleRedisServiceObject(object):
-    def __init__(self, **kwargs):
-        self.host = kwargs["host"]
-        self.port = kwargs.get("port", 6379)
-        self.redis_server = redis.StrictRedis(self.host, self.port)
-
-    def clear_keys_by_pattern(self, pattern):
-        for key in self.redis_server.scan_iter(pattern):
-            self.redis_server.delete(key)
-
-
-class RedisServiceObject(object):
-    def __init__(self, **kwargs):
-        self.host = kwargs["host"]
-        self.port = kwargs.get("port", 6379)
-        self.redis_server = redisx.RedisServer(self.host, self.port)
-
-        self.default_queue_prefix = kwargs.get("default_queue_name_prefix", "queue_")
-        self.default_map_prefix = kwargs.get("default_map_prefix", "map_")
-
-    def incr(self, data_config):
-        return self.redis_server.newUUID(data_config)
-
-    def get_queue(self, object_name):
-        key = redisx.compose_key(self.default_queue_prefix, object_name)
-        return redisx.Queue(key, self.redis_server)
-
-    def get_map(self, object_name):
-        key = redisx.compose_key(self.default_map_prefix, object_name)
-        return redisx.Hashtable(key, self.redis_server)
 
 
 LOOKUP_SVC_PARAM_NAMES = ["table_name", "key_columns"]

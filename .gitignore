@@ -164,3 +164,4 @@ cython_debug/
 
 temp_data/
 temp_scripts/
+temp_sql/

@@ -1,0 +1,76 @@
+# 
+# YAML init file for beekeeper 
+#
+#
+globals:
+    project_home: $REQ_HOME
+    service_module: rq_services
+    datastore_module: rq_datastores    
+
+service_objects:
+
+  s3:
+    class: S3Service
+    init_params:  
+      - name: region
+        value: us-east-1
+
+      - name: local_temp_path
+        value: /tmp
+
+      - name: auth_method
+        value: profile
+
+      - name: profile_name
+        value: appreciate
+
+  postgres:
+    class: PostgreSQLService
+    init_params:
+      - name: host
+        value: localhost
+  
+      - name: port
+        value: 15433
+  
+      - name: dbname
+        value: reqdb
+
+      - name: schema
+        value: public
+  
+      - name: username
+        value: reqdba
+  
+      - name: password
+        value: $REQ_DBA_PASSWORD
+
+      - name: connect_timeout
+        value: 5
+      
+datastores:
+  console:
+    class: ConsoleDatastore
+    init_params:
+
+  s3:
+    class: S3Datastore
+    init_params:
+
+  db:
+    class: PostgresDatastore
+    init_params:
+        
+    channel_select_function: 
+    channels:
+        
+
+ingest_targets:
+  db:
+    datastore: db
+    checkpoint_interval: 1000
+
+
+  s3: 
+    datastore: s3
+    checkpoint_interval: 100

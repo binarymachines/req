@@ -176,8 +176,9 @@ gen-hashdb:
 	echo 'placeholder'
 
 
-pipeline-filedata-init: dl-manifest get-headers get-filedata gen-metahashes gen-hashdb
+pipeline-filedata-upload: #dl-manifest get-headers get-filedata gen-metahashes gen-hashdb
 
+	cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target s3
 
 
 pipeline-filedata-refresh:
