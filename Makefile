@@ -66,8 +66,9 @@ db-purge:
 
 
 db-create-tables:	
-	export PGPASSWORD=$$REQ_DBA_PASSWORD && psql -h localhost -U reqdba -d reqdb -f sql/req_db_extensions.sql
-	export PGPASSWORD=$$CVX_DBA_PASSWORD && psql -h localhost -U reqdba -d reqdb -f sql/req_ddl.sql
+
+	export PGPASSWORD=$$REQ_DBA_PASSWORD && psql -U reqdba --port=15433 --host=localhost -d reqdb -w -f sql/req_db_extensions.sql
+	export PGPASSWORD=$$REQ_DBA_PASSWORD && psql -U reqdba --port=15433 --host=localhost -d reqdb -w -f sql/req_ddl.sql
 
 
 dl-manifest:
