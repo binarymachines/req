@@ -8,9 +8,66 @@ required-dirs:
 	cat required_dirs.txt | xargs mkdir -p
 
 
+clean:
+	rm -f temp_data/*
+	rm -f temp_scripts/*
+	rm -f temp_sql/*
+
+
 infra-setup:
 	./setup_infra.sh
 
+
+db-up:
+	docker compose up -d
+
+
+db-down:
+	docker compose down
+
+
+dblogin:
+	psql -U user --port=15433 --host=localhost -W
+
+dbalogin:
+	psql -U reqdba --port=15433 --host=localhost -d reqdb
+ 
+
+gen-dba-script:
+	warp --py --template-file=template_files/mkdbauser.sql.tpl \
+	--params=role:reqdba,description:Administrator,pw:$$REQ_DBA_PASSWORD,db_name:reqdb \
+	> temp_sql/create_dba_role.sql
+
+
+gen-db-script: 
+	warp --py --template-file=template_files/mkdb.sql.tpl --params=db_name:reqdb \
+	> temp_sql/create_db.sql
+
+
+gen-perm-script:
+	warp --py --template-file=template_files/perms.sql.tpl --params=db_name:reqdb,role:reqdba \
+	> temp_sql/set_perms.sql
+
+
+db-create-database:
+	psql -U user --port=15433 --host=localhost -W -f temp_sql/create_db.sql
+
+
+db-create-dbauser:
+	psql -U user --port=15433 --host=localhost  -W -f temp_sql/create_dba_role.sql
+
+
+db-set-perms:
+	psql -U user --port=15433 --host=localhost  -W -f temp_sql/set_perms.sql
+
+
+db-purge:
+	psql -U user --port=15433 --host=localhost  -W -f sql/purge.sql
+
+
+db-create-tables:	
+	export PGPASSWORD=$$REQ_DBA_PASSWORD && psql -h localhost -U reqdba -d reqdb -f sql/req_db_extensions.sql
+	export PGPASSWORD=$$CVX_DBA_PASSWORD && psql -h localhost -U reqdba -d reqdb -f sql/req_ddl.sql
 
 
 dl-manifest:
