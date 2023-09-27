@@ -10,7 +10,7 @@ required-dirs:
 
 infra-setup:
 	./setup_infra.sh
-	
+
 
 
 dl-manifest:
@@ -111,6 +111,21 @@ gen-metahashes:
 
 	mergein2j --from-list temp_data/metahashes.txt --key metahash --into temp_data/file_download_manifest.json \
 	> temp_data/file_ingest_manifest.json
+
+
+gen-hashdb:
+
+	echo 'placeholder'
+
+
+pipeline-filedata-init: dl-manifest get-headers get-filedata gen-metahashes gen-hashdb
+
+
+
+pipeline-filedata-refresh:
+
+	echo 'placeholder'
+
 
 
 get-apidata:

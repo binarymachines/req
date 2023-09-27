@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  
+  apexdb:
+    container_name: reqdb
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      PGPASSWORD: pass
+    image: postgres:14.6-alpine
+    ports:
+      - "15433:5432"
+    volumes:
+      - reqdb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "psql", "-h", "localhost", "postgres", "-U", "user", "-c", "select 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  reqdb-data: {}
+
