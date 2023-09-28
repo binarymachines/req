@@ -57,5 +57,5 @@ service_objects:
 setups:
   test:     
       filter_func: filter_manifest_records
-      file_target: existing_records.jsonl
+      file_target: /dev/null
       mode: reject

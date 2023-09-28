@@ -9,6 +9,7 @@ from mercury.dataload import DataStore
 from mercury.mlog import mlog, mlog_err
 
 
+
 class ObjectFactory(object):
     @classmethod
     def create_db_object(cls, table_name, db_svc, **kwargs):
@@ -44,6 +45,8 @@ class S3Datastore(DataStore):
             filename = rec['local_file']
 
             local_path = os.path.join(os.getcwd(), s3_svc.local_tmp_path, filename)
+
+            print(f'uploading local file temp_data/{filename} to S3 bucket {bucket_name}...')
             s3_svc.upload_object(local_path, bucket_name)
 
         
@@ -68,9 +71,12 @@ class PostgresDatastore(DataStore):
 
     def write_asset_record(self, record, db_service, **write_params):
     
+        infra_svc = self.service_object_registry.lookup('infra')
+        bucket_name = infra_svc.lookup_infra_asset('s3_bucket_id')
+
         asset_record = {
             'id': str(uuid.uuid4()),
-            's3_uri': 'placeholder',
+            's3_uri': f's3://{bucket_name}/{record["local_file"]}',
             'filename': record['local_file'],
             'source_url_base': record['base_url'],
             'source_url_path': record['srcfile'],

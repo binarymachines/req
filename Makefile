@@ -1,8 +1,14 @@
+##
+## Makefile for Rearc pipelines
+##
+
+
 	#____________________________________________________________________
 	#
 	# 
 	#
 	#____________________________________________________________________
+	#
 
 required-dirs:
 	cat required_dirs.txt | xargs mkdir -p
@@ -79,6 +85,7 @@ dl-manifest:
 	# Generate a structured-data manifest to drive our download operations
 	#
 	#____________________________________________________________________
+	#
 
 	lftp -c du -a $(BASE_URL)/pub/time.series/pr/ \
 	| awk '{ print $$2 }' | scripts/filter_path_list.py > temp_data/src_datafiles.txt
@@ -103,6 +110,7 @@ get-headers:
 	# here we pull the HTTP headers for each file in the target location 
 	#
 	#____________________________________________________________________
+	#
 
 	cp template_files/shell_script_core.sh.tpl temp_scripts/download_headers.sh
 
@@ -122,6 +130,7 @@ get-filedata:
 	# download the actual datafiles, using our generated manifest as a guide
 	#
 	#____________________________________________________________________
+	#
 
 	cp template_files/shell_script_core.sh.tpl temp_scripts/download_files.sh
 
@@ -147,6 +156,7 @@ gen-metahashes:
 	# we need to re-download.
 	#
 	#____________________________________________________________________
+	#
 
 	loopr -j --listfile temp_data/file_download_manifest.json \
 	--cmd-string 'scripts/parse_header.py --file temp_data/{header_file} --fields=content-length,last-modified' \
@@ -166,53 +176,74 @@ gen-metahashes:
 	# When we feed the manifest to our ingest routine, those values will be included.
 	#
 	#____________________________________________________________________
+	#
 
 	mergein2j --from-list temp_data/metahashes.txt --key metahash --into temp_data/file_download_manifest.json \
 	> temp_data/file_ingest_manifest.json
 
 
-gen-hashdb:
+pipeline-filedata-init-upload: dl-manifest get-headers get-filedata gen-metahashes
 
-	echo 'placeholder'
+	#____________________________________________________________________
+	#
+	# ngst is a general-purpose ingestion utility; the actual ingestion logic lives 
+	# in the Datasource designated in the initfile. Therefore we can use the same utility
+	# and the same command structure to upload to S3 and to ingest to our PostgreSQL instance. 
+	#
+	#____________________________________________________________________
+	#
 
-
-pipeline-filedata-init-upload: #dl-manifest get-headers get-filedata gen-metahashes
-
-	#cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target s3
+	cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target s3
 	cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target db
 
 
 
-pipeline-filedata-refresh: #dl-manifest get-headers gen-metahashes
+pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
+	$(eval USER_AGENT=Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/81.0)
 
 	#____________________________________________________________________
 	#
-	# After we get the HTTP file headers (but before we download data) 
+	# After we get the HTTP file headers (but before we download data),
 	# we will filter the ingestion manifest, rejecting all the records corresponding to
 	# files we've stored in the database.
 	#  
 	# (We run jfiltr in "reject" mode, which will write rejected records to a designated file
-	# and emit the records we want to stdout)
+	# -- in this case, /dev/null -- and emit the records we want to stdout)
 	#____________________________________________________________________
+	#
 
 	
+	rm -f temp_data/filtered_file_ingest_manifest.jsonl
+
 	jfiltr --config config/filter_dl_manifest.yaml --setup test \
-	--source temp_data/file_ingest_manifest.json > temp_data/filtered_file_ingest_manifest.json
+	--source temp_data/file_ingest_manifest.json > temp_data/filtered_file_ingest_manifest.jsonl
 
 	#____________________________________________________________________
 	#
 	# Download only the changed datafiles, using our filtered manifest as a guide
 	#
 	#____________________________________________________________________
+	#
 
 	cp template_files/shell_script_core.sh.tpl temp_scripts/download_updated_files.sh
 
-	loopr -p -j --listfile temp_data/filtered_file_ingest_manifest.json \
+	loopr -p -j --listfile temp_data/filtered_file_ingest_manifest.jsonl \
 	--cmd-string 'wget -U "$(USER_AGENT)" {base_url}{srcfile} -O temp_data/{local_file}; pause 1' \
 	>> temp_scripts/download_updated_files.sh
 
 	chmod u+x temp_scripts/download_updated_files.sh
-	#temp_scripts/download_updated_files.sh
+	temp_scripts/download_updated_files.sh
+
+	#____________________________________________________________________
+	#
+	# Use the filtered manifest to upload and then ingest ONLY the updated files
+	#
+	#____________________________________________________________________
+	#
+
+	cat temp_data/filtered_file_ingest_manifest.jsonl | ngst --config config/ingest_file_assets.yaml --target s3
+	cat temp_data/filtered_file_ingest_manifest.jsonl | ngst --config config/ingest_file_assets.yaml --target db
+
 
 
 get-apidata-single:
