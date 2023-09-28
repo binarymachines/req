@@ -9,6 +9,12 @@ globals:
 
 service_objects:
 
+  infra:
+    class: InfraLookupService
+    init_params:
+      - name: infra_datafile
+        value: data/infra_setup.json
+
   s3:
     class: S3Service
     init_params:  
@@ -16,13 +22,16 @@ service_objects:
         value: us-east-1
 
       - name: local_temp_path
-        value: /tmp
+        value: temp_data
 
       - name: auth_method
-        value: profile
+        value: basic
 
-      - name: profile_name
-        value: appreciate
+      - name: aws_key_id
+        value: $AWS_KEY_ID
+
+      - name: aws_secret_key
+        value: $AWS_SECRET_KEY
 
   postgres:
     class: PostgreSQLService

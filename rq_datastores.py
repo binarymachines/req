@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import json
 from snap import common
 from mercury.dataload import DataStore
@@ -32,10 +33,18 @@ class S3Datastore(DataStore):
     def write(self, records, **write_params):
 
         s3_svc = self.service_object_registry.lookup('s3')
+        infra_svc = self.service_object_registry.lookup('infra')
+
+        bucket_name = infra_svc.lookup_infra_asset('s3_bucket_id')
+
         for raw_rec in records:
-            print(raw_rec)
+            rec = json.loads(raw_rec)
+            filename = rec['local_file']
 
+            local_path = os.path.join(os.getcwd(), s3_svc.local_tmp_path, filename)
+            s3_svc.upload_object(local_path, bucket_name)
 
+        
 class PostgresDatastore(DataStore):
     def __init__(self, service_object_registry, *channels, **kwargs):
         super().__init__(service_object_registry, *channels, **kwargs)

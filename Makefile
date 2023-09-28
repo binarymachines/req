@@ -186,7 +186,6 @@ pipeline-filedata-refresh:
 	echo 'placeholder'
 
 
-
 get-apidata:
 	beekeeper --config config/bkpr_datausa.yaml --target state | jq -r .data \
 	> temp_data/pop_data_state.json

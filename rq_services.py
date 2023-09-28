@@ -53,6 +53,25 @@ class DeduplicatorService(object):
         
         """
 
+class InfraLookupService(object):
+    def __init__(self, **kwargs):
+        if not kwargs.get('infra_datafile'):
+            raise Exception('"infra_datafile" is a required parameter for InfraLookupService.')
+
+        self.infra_data = None
+
+        with open(kwargs['infra_datafile'], 'r') as f:
+            rawdata = f.read()
+            self.infra_data = json.loads(rawdata)
+
+    def lookup_infra_asset(self, asset_key):
+        
+        record =  self.infra_data.get(asset_key)
+        if record:
+            return record['value']
+        
+        return 'NO_SUCH_ASSET'
+    
 
 class SimpleAWSSecretService(object):
     def __init__(self, **kwargs):
