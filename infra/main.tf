@@ -59,8 +59,7 @@ module "all_notifications" {
     sqs1 = {
       queue_arn     = aws_sqs_queue.this.arn
       events        = ["s3:ObjectCreated:Put"]
-      filter_prefix = "prefix1/"
-      filter_suffix = ".json"
+      filter_prefix = "pr."      
     }
   }
 

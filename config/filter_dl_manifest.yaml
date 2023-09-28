@@ -1,11 +1,8 @@
-# 
-# YAML init file for ngst 
-#
-#
+
 globals:
     project_home: $REQ_HOME
     service_module: rq_services
-    datastore_module: rq_datastores    
+    filter_module: rq_filters    
 
 service_objects:
 
@@ -56,30 +53,9 @@ service_objects:
 
       - name: connect_timeout
         value: 5
-      
-datastores:
-  console:
-    class: ConsoleDatastore
-    init_params:
 
-  s3:
-    class: S3Datastore
-    init_params:
-
-  db:
-    class: PostgresDatastore
-    init_params:
-        
-    channel_select_function: 
-    channels:
-        
-
-ingest_targets:
-  db:
-    datastore: db
-    checkpoint_interval: 1000
-
-
-  s3: 
-    datastore: s3
-    checkpoint_interval: 100
+setups:
+  test:     
+      filter_func: filter_manifest_records
+      file_target: existing_records.jsonl
+      mode: accept

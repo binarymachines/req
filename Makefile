@@ -176,17 +176,27 @@ gen-hashdb:
 	echo 'placeholder'
 
 
-pipeline-filedata-upload: #dl-manifest get-headers get-filedata gen-metahashes gen-hashdb
+pipeline-filedata-init-upload: dl-manifest get-headers get-filedata gen-metahashes
 
 	cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target s3
 
 
-pipeline-filedata-refresh:
+pipeline-filedata-refresh: #dl-manifest get-headers gen-metahashes
 
-	echo 'placeholder'
+	#____________________________________________________________________
+	#
+	# After we get the HTTP file headers (but before we download data) 
+	# we will compare the metahashes to the ones we've stored in the database.
+	#  
+	#____________________________________________________________________
+
+	
+	jfiltr --config config/filter_dl_manifest.yaml --setup test \
+	--source temp_data/file_ingest_manifest.json
+	
 
 
-get-apidata:
+get-apidata-single:
 	beekeeper --config config/bkpr_datausa.yaml --target state | jq -r .data \
 	> temp_data/pop_data_state.json
 
