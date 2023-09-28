@@ -58,4 +58,4 @@ setups:
   test:     
       filter_func: filter_manifest_records
       file_target: existing_records.jsonl
-      mode: accept
+      mode: reject

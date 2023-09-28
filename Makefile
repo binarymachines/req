@@ -176,9 +176,11 @@ gen-hashdb:
 	echo 'placeholder'
 
 
-pipeline-filedata-init-upload: dl-manifest get-headers get-filedata gen-metahashes
+pipeline-filedata-init-upload: #dl-manifest get-headers get-filedata gen-metahashes
 
-	cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target s3
+	#cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target s3
+	cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target db
+
 
 
 pipeline-filedata-refresh: #dl-manifest get-headers gen-metahashes
@@ -186,14 +188,31 @@ pipeline-filedata-refresh: #dl-manifest get-headers gen-metahashes
 	#____________________________________________________________________
 	#
 	# After we get the HTTP file headers (but before we download data) 
-	# we will compare the metahashes to the ones we've stored in the database.
+	# we will filter the ingestion manifest, rejecting all the records corresponding to
+	# files we've stored in the database.
 	#  
+	# (We run jfiltr in "reject" mode, which will write rejected records to a designated file
+	# and emit the records we want to stdout)
 	#____________________________________________________________________
 
 	
 	jfiltr --config config/filter_dl_manifest.yaml --setup test \
-	--source temp_data/file_ingest_manifest.json
-	
+	--source temp_data/file_ingest_manifest.json > temp_data/filtered_file_ingest_manifest.json
+
+	#____________________________________________________________________
+	#
+	# Download only the changed datafiles, using our filtered manifest as a guide
+	#
+	#____________________________________________________________________
+
+	cp template_files/shell_script_core.sh.tpl temp_scripts/download_updated_files.sh
+
+	loopr -p -j --listfile temp_data/filtered_file_ingest_manifest.json \
+	--cmd-string 'wget -U "$(USER_AGENT)" {base_url}{srcfile} -O temp_data/{local_file}; pause 1' \
+	>> temp_scripts/download_updated_files.sh
+
+	chmod u+x temp_scripts/download_updated_files.sh
+	#temp_scripts/download_updated_files.sh
 
 
 get-apidata-single:

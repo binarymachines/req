@@ -2,6 +2,8 @@
 
 import os
 import json
+import uuid
+import datetime 
 from snap import common
 from mercury.dataload import DataStore
 from mercury.mlog import mlog, mlog_err
@@ -49,9 +51,41 @@ class PostgresDatastore(DataStore):
     def __init__(self, service_object_registry, *channels, **kwargs):
         super().__init__(service_object_registry, *channels, **kwargs)
 
+    '''
+    CREATE TABLE "file_assets" (
+        "id" uuid NOT NULL,
+        "s3_uri" varchar(255) NOT NULL,
+        "filename" varchar(32) NOT NULL,
+        "source_url_base" varchar(64) NOT NULL,
+        "source_url_path" varchar(64) NOT NULL,
+        "source_metahash" varchar(255) NOT NULL,
+        "created_ts" timestamp NOT NULL,
+        "updated_ts" timestamp,
+        "replaces_asset_id" uuid,
+        PRIMARY KEY ("id")
+        );
+    '''
 
     def write_asset_record(self, record, db_service, **write_params):
-        pass
+    
+        asset_record = {
+            'id': str(uuid.uuid4()),
+            's3_uri': 'placeholder',
+            'filename': record['local_file'],
+            'source_url_base': record['base_url'],
+            'source_url_path': record['srcfile'],
+            'source_metahash': record['metahash'],
+            'created_ts': datetime.datetime.now(),
+            'updated_ts': None,
+            'replaces_asset_id': None # TODO: look up record-to-replace by filename
+        }
+
+        with db_service.txn_scope() as session:
+            db_asset_record = ObjectFactory.create_db_object('file_assets', db_service, **asset_record)
+            session.add(db_asset_record)
+        
+        return record['metahash']
+    
 
     def write(self, records, **write_params):
         postgres_svc = self.service_object_registry.lookup("postgres")
@@ -60,15 +94,13 @@ class PostgresDatastore(DataStore):
             rec = json.loads(raw_rec)
             
             try:
-                output_rec = self.write_asset_record(rec, postgres_svc)
-                print(json.dumps(output_rec))
+                output_str = self.write_asset_record(rec, postgres_svc)
+                print(output_str)
 
             except Exception as err:
                 mlog_err(
                     err, issue=f"Error ingesting {record_type} record.", record=rec
                 )
-
-            
 
         """
         TODO:
