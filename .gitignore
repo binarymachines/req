@@ -19,6 +19,7 @@ lib64/
 parts/
 sdist/
 var/
+env_setup/
 wheels/
 share/python-wheels/
 *.egg-info/
@@ -165,3 +166,5 @@ cython_debug/
 temp_data/
 temp_scripts/
 temp_sql/
+infra/terraform.tfstate.backup
+
