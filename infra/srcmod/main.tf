@@ -521,7 +521,25 @@ resource "aws_s3_bucket_policy" "this" {
   # Ref: https://github.com/hashicorp/terraform-provider-aws/issues/7628
 
   bucket = aws_s3_bucket.this[0].id
-  policy = data.aws_iam_policy_document.combined[0].json
+  #policy = data.aws_iam_policy_document.combined[0].json
+
+  policy = <<EOF
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+      "Principal": "*",
+        "Action": [ "s3:*" ],
+        "Resource": [
+          "${aws_s3_bucket.this[0].arn}",
+          "${aws_s3_bucket.this[0].arn}/*"
+        ]
+      }
+    ]
+  }
+  EOF
+
 
   depends_on = [
     aws_s3_bucket_public_access_block.this

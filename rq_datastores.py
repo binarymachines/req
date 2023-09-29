@@ -116,6 +116,7 @@ class PostgresDatastore(DataStore):
             elif record_type == 'deletion':
                 try:
                     self.delete_asset_record(rec, postgres_svc)
+                    print(raw_rec)
 
                 except Exception as err:    
                     mlog_err(err, issue=f"Error deleting asset record.", record=rec)

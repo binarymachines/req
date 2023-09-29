@@ -196,7 +196,7 @@ pipeline-filedata-init-upload: dl-manifest get-headers get-filedata gen-metahash
 	#____________________________________________________________________
 	#
 
-	#cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target s3
+	cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target s3
 	cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target db
 
 
@@ -213,6 +213,13 @@ pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
 	#____________________________________________________________________
 	#
 
+	#____________________________________________________________________
+	#
+	# Query the database, then run a custom script comparing the file assets in our DB
+	# to our latest download records
+	#____________________________________________________________________
+	#
+
 	export PGPASSWORD=$$REQ_DBA_PASSWORD && psql -U reqdba --port=15433 --host=localhost -d reqdb -w -f sql/all_assets.sql \
 	| tail -n -2 > temp_data/all_db_assets.jsonl
 
@@ -226,16 +233,42 @@ pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
 	# Now that we have a list of deleted files (assets which are logged in the database, but do not appear
 	# in the latest download manifest), we apply those to the database and to S3.
 	#
-	# Here we can also use ngst, specifying the "deletion" record type.
+	# Here we can use ngst for the DB step, specifying the "deletion" record type.
 	#____________________________________________________________________
 	#
 	
 	cat temp_data/deleted_files.txt | tuple2json --delimiter ',' --keys=deleted_filename \
 	> temp_data/deleted_files.jsonl
 
-	cat temp_data/deleted_files.jsonl | ngst --config config/ingest_file_assets.yaml --target db --params=record_type:deletion
+	cat temp_data/deleted_files.jsonl | ngst --config config/ingest_file_assets.yaml --target db --params=record_type:deletion \
+	> temp_data/s3_deletion_targets.jsonl
 
-	# TODO: apply S3 updates
+	#____________________________________________________________________
+	#
+	# We set the database operation to emit the deletion records, so that a failed
+	# DB op will not result in an S3 deletion. Now we use that output to generate
+	# the proper S3 commands.
+	#____________________________________________________________________
+	#
+
+	repeat --linecount temp_data/s3_deletion_targets.jsonl --str `cat data/infra_setup.json | jq .s3_bucket_id.value -r` \
+	> temp_data/s3_bucket_ids.txt
+
+	loopr -p -j --listfile temp_data/s3_deletion_targets.jsonl \
+	--cmd-string '{deleted_filename}' > temp_data/s3_delete_files.txt
+
+	tuplegen --delimiter ',' --listfiles=temp_data/s3_bucket_ids.txt,temp_data/s3_delete_files.txt \
+	| tuple2json --delimiter ',' --keys=bucket,file > temp_data/s3_deletion_manifest.jsonl
+	
+	#____________________________________________________________________
+	#
+	# Running loopr in normal mode (without the -p flag, which is for "preview") causes it
+	# to execute the command string, rather than simply emitting it to stdout
+	#
+	#____________________________________________________________________ 
+
+	loopr -j --listfile temp_data/s3_deletion_manifest.jsonl \
+	--cmd-string 'aws s3 rm s3://{bucket}/{file}'
 
 	#____________________________________________________________________
 	#
@@ -279,12 +312,13 @@ pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
 	cat temp_data/filtered_file_ingest_manifest.jsonl | ngst --config config/ingest_file_assets.yaml --target db
 
 
-get-apidata-single:
-	beekeeper --config config/bkpr_datausa.yaml --target state | jq -r .data \
-	> temp_data/pop_data_state.json
-
+get-apidata:
 	beekeeper --config config/bkpr_datausa.yaml --target nation | jq -r .data \
 	> temp_data/pop_data_nation.json
+
+	aws s3 cp temp_data/pop_data_nation.json s3://`cat data/infra_setup.json | jq .s3_bucket_id.value -r`
+
+	
 
 
 
