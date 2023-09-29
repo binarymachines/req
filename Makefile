@@ -135,7 +135,7 @@ get-filedata:
 	cp template_files/shell_script_core.sh.tpl temp_scripts/download_files.sh
 
 	loopr -p -j --listfile temp_data/file_download_manifest.json \
-	--cmd-string 'wget -U "$(USER_AGENT)" {base_url}{srcfile} -O temp_data/{local_file}; pause 1' \
+	--cmd-string 'wget -U "$(USER_AGENT)" {base_url}{srcfile} -O temp_data/{local_file}' \
 	>> temp_scripts/download_files.sh
 
 	chmod u+x temp_scripts/download_files.sh
@@ -188,14 +188,16 @@ pipeline-filedata-init-upload: dl-manifest get-headers get-filedata gen-metahash
 	#
 	# ngst is a general-purpose ingestion utility; the actual ingestion logic lives 
 	# in the Datasource designated in the initfile. Therefore we can use the same utility
-	# and the same command structure to upload to S3 and to ingest to our PostgreSQL instance. 
+	# and the same command structure to upload to S3 and to ingest to our PostgreSQL instance.
+	#
+	# And yes, we could collapse this target and its "refresh" sibling into one, but having
+	# them separate made testing easier. DOTS ;-)
 	#
 	#____________________________________________________________________
 	#
 
-	cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target s3
+	#cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target s3
 	cat temp_data/file_ingest_manifest.json | ngst --config config/ingest_file_assets.yaml --target db
-
 
 
 pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
@@ -204,15 +206,47 @@ pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
 	#____________________________________________________________________
 	#
 	# After we get the HTTP file headers (but before we download data),
-	# we will filter the ingestion manifest, rejecting all the records corresponding to
-	# files we've stored in the database.
-	#  
-	# (We run jfiltr in "reject" mode, which will write rejected records to a designated file
-	# -- in this case, /dev/null -- and emit the records we want to stdout)
+	# we will 
+	#
+	# (a) detect any deletions, and 
+	# (b) filter the ingestion manifest
 	#____________________________________________________________________
 	#
 
+	export PGPASSWORD=$$REQ_DBA_PASSWORD && psql -U reqdba --port=15433 --host=localhost -d reqdb -w -f sql/all_assets.sql \
+	| tail -n -2 > temp_data/all_db_assets.jsonl
+
+	cat temp_data/all_db_assets.jsonl | jq .[] | jq -r .filename > temp_data/db_asset_filenames.txt
+
+	scripts/detect_deletions.py --manifest temp_data/file_ingest_manifest.json --dbassets temp_data/db_asset_filenames.txt \
+	> temp_data/deleted_files.txt
+
+	#____________________________________________________________________
+	#
+	# Now that we have a list of deleted files (assets which are logged in the database, but do not appear
+	# in the latest download manifest), we apply those to the database and to S3.
+	#
+	# Here we can also use ngst, specifying the "deletion" record type.
+	#____________________________________________________________________
+	#
 	
+	cat temp_data/deleted_files.txt | tuple2json --delimiter ',' --keys=deleted_filename \
+	> temp_data/deleted_files.jsonl
+
+	cat temp_data/deleted_files.jsonl | ngst --config config/ingest_file_assets.yaml --target db --params=record_type:deletion
+
+	# TODO: apply S3 updates
+
+	#____________________________________________________________________
+	#
+	# Now we run jfiltr against our manifest in "reject" mode, which will write rejected records to a 
+	# designated file -- in this case, /dev/null -- and emit the records we want to stdout.
+	#
+	# A record is rejected if its "metahash" field has no match in the database,
+	# which means that a file has changed on the server
+	#____________________________________________________________________
+	#
+
 	rm -f temp_data/filtered_file_ingest_manifest.jsonl
 
 	jfiltr --config config/filter_dl_manifest.yaml --setup test \
@@ -228,7 +262,7 @@ pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
 	cp template_files/shell_script_core.sh.tpl temp_scripts/download_updated_files.sh
 
 	loopr -p -j --listfile temp_data/filtered_file_ingest_manifest.jsonl \
-	--cmd-string 'wget -U "$(USER_AGENT)" {base_url}{srcfile} -O temp_data/{local_file}; pause 1' \
+	--cmd-string 'wget -U "$(USER_AGENT)" {base_url}{srcfile} -O temp_data/{local_file}' \
 	>> temp_scripts/download_updated_files.sh
 
 	chmod u+x temp_scripts/download_updated_files.sh
@@ -243,7 +277,6 @@ pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
 
 	cat temp_data/filtered_file_ingest_manifest.jsonl | ngst --config config/ingest_file_assets.yaml --target s3
 	cat temp_data/filtered_file_ingest_manifest.jsonl | ngst --config config/ingest_file_assets.yaml --target db
-
 
 
 get-apidata-single:

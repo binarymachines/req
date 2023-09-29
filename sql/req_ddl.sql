@@ -7,6 +7,7 @@ CREATE TABLE "file_assets" (
   "source_metahash" varchar(255) NOT NULL,
   "created_ts" timestamp NOT NULL,
   "updated_ts" timestamp,
+  "deleted_ts" timestamp,
   "replaces_asset_id" uuid,
   PRIMARY KEY ("id")
 );

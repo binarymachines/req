@@ -7,6 +7,8 @@ import datetime
 from snap import common
 from mercury.dataload import DataStore
 from mercury.mlog import mlog, mlog_err
+from sqlalchemy import select, update, bindparam, text
+from sqlalchemy.schema import Table
 
 
 
@@ -54,20 +56,6 @@ class PostgresDatastore(DataStore):
     def __init__(self, service_object_registry, *channels, **kwargs):
         super().__init__(service_object_registry, *channels, **kwargs)
 
-    '''
-    CREATE TABLE "file_assets" (
-        "id" uuid NOT NULL,
-        "s3_uri" varchar(255) NOT NULL,
-        "filename" varchar(32) NOT NULL,
-        "source_url_base" varchar(64) NOT NULL,
-        "source_url_path" varchar(64) NOT NULL,
-        "source_metahash" varchar(255) NOT NULL,
-        "created_ts" timestamp NOT NULL,
-        "updated_ts" timestamp,
-        "replaces_asset_id" uuid,
-        PRIMARY KEY ("id")
-        );
-    '''
 
     def write_asset_record(self, record, db_service, **write_params):
     
@@ -93,31 +81,45 @@ class PostgresDatastore(DataStore):
         return record['metahash']
     
 
+    def delete_asset_record(self, record, db_service, **write_params):
+
+        mlog(f'deleting asset record for filename: {record["deleted_filename"]}...')
+
+        deletion_stmt = text('''
+            UPDATE file_assets SET deleted_ts = :deletion_time WHERE filename = :file
+        ''')
+        
+        with db_service.engine.begin() as connection:
+            connection.execute(deletion_stmt, {
+                "file": record['deleted_filename'],
+                "deletion_time": datetime.datetime.now()
+            })
+
+
     def write(self, records, **write_params):
         postgres_svc = self.service_object_registry.lookup("postgres")
         record_type = write_params.get("record_type", "asset")
+
         for raw_rec in records:
             rec = json.loads(raw_rec)
+
+            if record_type == 'asset':
+                try:
+                    output_str = self.write_asset_record(rec, postgres_svc)
+                    print(output_str)
+
+                except Exception as err:
+                    mlog_err(
+                        err, issue=f"Error ingesting {record_type} record.", record=rec
+                    )
+
+            elif record_type == 'deletion':
+                try:
+                    self.delete_asset_record(rec, postgres_svc)
+
+                except Exception as err:    
+                    mlog_err(err, issue=f"Error deleting asset record.", record=rec)
             
-            try:
-                output_str = self.write_asset_record(rec, postgres_svc)
-                print(output_str)
-
-            except Exception as err:
-                mlog_err(
-                    err, issue=f"Error ingesting {record_type} record.", record=rec
-                )
-
-        """
-        TODO:
-        1. create a lookup service for item attributes:
-
-        Attributes.productsup_meta (key for an attribute type) --
-   
-        "farfetch_product_id": csv_row["item_group_id"]
-            
-        """
-
 
 class FilteringConsoleDatastore(DataStore):
     def __init__(self, service_object_registry, *channels, **kwargs):
