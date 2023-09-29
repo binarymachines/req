@@ -226,7 +226,7 @@ pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
 	#
 
 	export PGPASSWORD=$$REQ_DBA_PASSWORD && psql -U reqdba --port=15433 --host=localhost -d reqdb -w -f sql/all_assets.sql \
-	| tail -n -2 > temp_data/all_db_assets.jsonl
+	| tail -n +2 > temp_data/all_db_assets.jsonl
 
 	cat temp_data/all_db_assets.jsonl | jq .[] | jq -r .filename > temp_data/db_asset_filenames.txt
 
@@ -280,7 +280,7 @@ pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
 	# Now we run jfiltr against our manifest in "reject" mode, which will write rejected records to a 
 	# designated file -- in this case, /dev/null -- and emit the records we want to stdout.
 	#
-	# A record is rejected if its "metahash" field has no match in the database,
+	# A record is rejected if its "metahash" field has no match in the database BUT the filename exists,
 	# which means that a file has changed on the server
 	#____________________________________________________________________
 	#
@@ -318,12 +318,24 @@ pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
 
 
 pipeline-get-apidata:
-	beekeeper --config config/bkpr_datausa.yaml --target nation | jq -r .data \
-	> temp_data/pop_data_nation.json
 
-	aws s3 cp temp_data/pop_data_nation.json s3://`cat data/infra_setup.json | jq .s3_bucket_id.value -r`
+	beekeeper --config config/bkpr_datausa.yaml --target nation | jq -r .data | jq .data \
+	> data/pop_data_nation.json
+
+	aws s3 cp data/pop_data_nation.json s3://`cat data/infra_setup.json | jq .s3_bucket_id.value -r`
+
+
+pipeline-api-stats: pipeline-get-apidata
+
+	scripts/dfscan.py data/pop_data_nation.json --stats=Population:std,Population:mean
 
 	
+pipeline-frame-readout: # test target
 
+	scripts/wscollapse.py --listfile temp_data/pr.data.0.Current --delimiter ',' \
+	| tail -n +2 | tuple2json --delimiter ',' --keys=series_id,year,period,value \
+	> data/bls_dataset.jsonl
+
+	scripts/dfscan.py --listfile data/bls_dataset.jsonl
 
 

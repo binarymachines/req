@@ -27,7 +27,7 @@ targets:
           value: Population
 
         - name: year
-          value: latest
+          value: 2013,2014,2015,2016,2017,2018
 
     
     state:
