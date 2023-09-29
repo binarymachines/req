@@ -1,0 +1,103 @@
+
+OVERVIEW:
+
+The req repo is a Mercury-style data pipeline stack, in which every pipeline is a make target.
+The targets themselves are modular, which enables the engineer to inspect and test targets in isolation. 
+
+Each pipeline target is simply a list of shell commands.
+
+Mercury data pipelines take an approach which borrows from the FP paradigm; that is, each pipeline target is
+really a series of functional data transforms. Within a given target, outputs are treated as immutable. 
+
+Pipeline commands journal their operations using a high-performance object database known as THE FILESYSTEM. ;-)
+Very often, the output of one command is the input to the next. Commands are composed using the built-in shell 
+primitives and stdin/stdout/stderr.
+
+Some of the commands used in pipeline targets are Mercury commands. Of those, some rely on configuration files, 
+which can be found in the <repo_root>/config directory. All Mercury commands are self-documenting, so that issuing 
+the Mercury command with no parameters will show the proper command syntax. 
+
+In-depth documentation for each Mercury command can be accessed by issuing "mdoc".
+The mdoc command by itself lists all of them; issue "mdoc <cmd_name>" to get the documentation for that command. 
+
+Issue 
+    mdoc <partial_string>? 
+or
+    mdoc ?<partial_string>
+
+to get a list of all commands beginning (or ending) with <partial_string>.  
+
+
+For this task set, I opted to use PostgreSQL to manage (source-file) state. The data downloads from the BLS site
+are driven by structured-data files called manifests, which drive other automated processes and are compared
+with database records to discern whether a source file has been updated or deleted.
+
+
+Mercury is open-source code. The Github repo is here:
+https://github.com/binarymachines/mercury
+
+
+PREREQUISITES: 
+
+Python version:
+- 3.11 or higher
+
+Tools:
+- Docker
+
+Command-line utilities:
+- make 
+- curl
+- jq
+- pipenv
+- aws-cli
+
+Libraries:
+- postgresql-client
+- postgresql-contrib
+- libpq-dev
+
+
+To set up the tooling environment:
+
+issue "pipenv install" to install the Python dependencies
+issue "pipenv shell" to start the virtual environment
+
+set the necessary environment vars:
+- REQ_HOME (this should be set to the repo root directory)
+- REQ_DBA_PASSWORD (this should be set to the DBA password for the Docker Postgres instance)
+
+- you may also need to set PYTHONPATH to the repo root directory.
+
+If you are using basic credentials to connect to AWS:
+- AWS_KEY_ID
+- AWS_SECRET_KEY
+
+
+GETTING STARTED:
+(all commands assume you are in the virtual environment)
+
+- issue "make required-dirs" 
+
+- bring up the local db by issuing "make db-up"
+
+- populate the db by issuing "make db-init"
+(thereafter, to log into the req database as the admin, issue "make dbalogin")
+
+- create the AWS infrastructure by issuing "make infra-setup"
+
+
++++ Once you've created the AWS stack and your local DB environment, you can run the data pipelines.
+
+- To download and republish the open dataset from BLS, you MUST first issue "make pipeline-filedata-init-upload".
+- Thereafter, you can issue "make pipeline-filedata-refresh" at the desired intervals to stay up-to-date.
+
+- To download and republish the dataset from the datausa.io API, issue "make pipeline-get-apidata".
+
+
+*** Bonus points if you know why I named that command "beekeeper".
+
+
+
+
+

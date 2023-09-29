@@ -67,6 +67,7 @@ db-set-perms:
 	psql -U user --port=15433 --host=localhost  -W -f temp_sql/set_perms.sql
 
 
+
 db-purge:
 	psql -U user --port=15433 --host=localhost  -W -f sql/purge.sql
 
@@ -75,6 +76,10 @@ db-create-tables:
 
 	export PGPASSWORD=$$REQ_DBA_PASSWORD && psql -U reqdba --port=15433 --host=localhost -d reqdb -w -f sql/req_db_extensions.sql
 	export PGPASSWORD=$$REQ_DBA_PASSWORD && psql -U reqdba --port=15433 --host=localhost -d reqdb -w -f sql/req_ddl.sql
+
+
+db-init: gen-db-script gen-dba-script gen-perm-script db-create-database db-create-dbauser db-set-perms db-create-tables
+
 
 
 dl-manifest:
@@ -190,8 +195,8 @@ pipeline-filedata-init-upload: dl-manifest get-headers get-filedata gen-metahash
 	# in the Datasource designated in the initfile. Therefore we can use the same utility
 	# and the same command structure to upload to S3 and to ingest to our PostgreSQL instance.
 	#
-	# And yes, we could collapse this target and its "refresh" sibling into one, but having
-	# them separate made testing easier. DOTS ;-)
+	# And yes, we could technically collapse this target and its "refresh" sibling into one, but having
+	# them separate makes testing easier. DOTS ;-)
 	#
 	#____________________________________________________________________
 	#
@@ -312,7 +317,7 @@ pipeline-filedata-refresh: dl-manifest get-headers gen-metahashes
 	cat temp_data/filtered_file_ingest_manifest.jsonl | ngst --config config/ingest_file_assets.yaml --target db
 
 
-get-apidata:
+pipeline-get-apidata:
 	beekeeper --config config/bkpr_datausa.yaml --target nation | jq -r .data \
 	> temp_data/pop_data_nation.json
 
